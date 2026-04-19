@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrainReport - Segnalazioni Ferroviarie</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#00f3ff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TrainReport">
+  
+  <style>
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.06);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --glass-highlight: rgba(255, 255, 255, 0.2);
+      --accent: #00f3ff;
+      --accent-secondary: #7000ff;
+      --accent-glow: rgba(0, 243, 255, 0.3);
+      --text-main: #e6f9ff;
+      --text-muted: #8aa3b5;
+      --bg-deep: #05080f;
+      --bg-gradient: radial-gradient(circle at 20% 30%, #0f172a 0%, var(--bg-deep) 70%);
+      --danger: #ff3b6e;
+      --success: #00ff9d;
+      --warning: #ffc107;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .app-container { width: 100%; max-width: 700px; margin-top: 1rem; }
+    
+    .glass-capsule {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 50px;
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      padding: 1.8rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 var(--glass-highlight);
+      position: relative;
+      overflow: hidden;
+    }
+    .glass-capsule::before {
+      content: ''; position: absolute; top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);
+      opacity: 0.3; pointer-events: none; z-index: -1;
+    }
+
+    h1 { text-align: center; margin-bottom: 0.5rem; font-weight: 600; letter-spacing: 0.5px; }
+    .subtitle { text-align: center; color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+    
+    .tabs { display: flex; gap: 0.8rem; margin-bottom: 1.5rem; }
+    .tab {
+      flex: 1; text-align: center; padding: 0.9rem; border-radius: 40px;
+      cursor: pointer; background: rgba(255,255,255,0.04); border: 1px solid transparent;
+      color: var(--text-muted); transition: all 0.3s; font-size: 0.95rem; position: relative;
+    }
+    .tab:hover { background: rgba(255,255,255,0.08); }
+    .tab.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      color: #000; font-weight: 600; border-color: rgba(255,255,255,0.3);
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+    .tab.locked::after { content: '🔒'; position: absolute; top: 0.5rem; right: 0.8rem; font-size: 0.8rem; }
+
+    .input-field {
+      width: 100%; padding: 1rem 1.3rem; margin: 0.6rem 0;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+      border-radius: 50px; color: var(--text-main); font-size: 1rem;
+      outline: none; transition: all 0.3s;
+    }
+    .input-field:focus {
+      border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow);
+      background: rgba(255,255,255,0.08);
+    }
+    .input-field::placeholder { color: var(--text-muted); }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      padding: 0.9rem 1.6rem; margin: 0.6rem 0.3rem; border: none; border-radius: 50px;
+      background: linear-gradient(135deg, var(--accent), #0088ff); color: #000;
+      font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; font-size: 0.95rem;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--accent-glow); }
+    .btn-secondary { background: rgba(255,255,255,0.1); color: var(--text-main); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.15); box-shadow: none; }
+    .btn-danger { background: rgba(255, 59, 110, 0.15); color: var(--danger); border: 1px solid rgba(255,59,110,0.3); }
+    .btn-danger:hover { background: rgba(255, 59, 110, 0.25); box-shadow: 0 4px 15px rgba(255,59,110,0.2); }
+    .btn-success { background: rgba(0, 255, 157, 0.15); color: var(--success); border: 1px solid rgba(0,255,157,0.3); }
+
+    .carriage-builder {
+      background: rgba(0,0,0,0.3); border-radius: 30px; padding: 1.2rem;
+      margin: 1.5rem 0; border: 1px solid var(--glass-border);
+    }
+    .carriage-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .carriage-header h3 { font-size: 1rem; color: var(--accent); margin: 0; }
+    
+    .issues-section {
+      background: rgba(0, 243, 255, 0.05); border: 1px dashed var(--accent);
+      border-radius: 20px; padding: 1rem; margin-top: 1rem;
+    }
+    .signals-label { display: block; color: var(--accent); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .responses-grid {
+      display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.8rem 0;
+    }
+    .resp-check {
+      display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem;
+      background: rgba(255,255,255,0.05); border-radius: 20px; cursor: pointer;
+      font-size: 0.85rem; border: 1px solid var(--glass-border); transition: all 0.2s;
+    }
+    .resp-check:hover { background: rgba(255,255,255,0.1); }
+    .resp-check input { accent-color: var(--accent); width: 1rem; height: 1rem; }
+    .resp-check input:checked + span { color: var(--accent); font-weight: 500; }
+
+    .issues-container { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+    .issue-pill {
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(255,255,255,0.08); padding: 0.6rem 1rem; border-radius: 25px;
+      border: 1px solid var(--glass-border); font-size: 0.9rem;
+    }
+    .issue-pill .issue-name { font-weight: 500; }
+    .issue-pill .issue-resps { font-size: 0.75rem; color: var(--text-muted); }
+    .issue-pill .remove-issue { cursor: pointer; color: var(--danger); margin-left: 0.8rem; font-weight: bold; }
+
+    .carriage-section { margin: 1.5rem 0; padding-bottom: 1rem; border-bottom: 1px solid var(--glass-border); }
+    .carriage-title { font-size: 1.1rem; margin-bottom: 1rem; color: var(--accent); font-weight: 500; }
+    .issue-fill-block { margin-bottom: 1.2rem; }
+    .issue-fill-label { font-size: 0.95rem; margin-bottom: 0.5rem; font-weight: 500; color: #fff; }
+    .radio-capsule-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .radio-capsule { position: relative; }
+    .radio-capsule input { position: absolute; opacity: 0; cursor: pointer; }
+    .radio-capsule label {
+      display: block; padding: 0.6rem 1rem; border-radius: 30px;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+      cursor: pointer; transition: all 0.25s ease; font-size: 0.85rem; user-select: none;
+    }
+    .radio-capsule input:checked + label {
+      background: var(--accent-glow); border-color: var(--accent);
+      color: #fff; box-shadow: 0 0 12px var(--accent-glow); transform: scale(1.05);
+    }
+
+    .response-card {
+      background: rgba(255,255,255,0.04); border-radius: 40px; padding: 1.2rem;
+      margin: 0.8rem 0; border: 1px solid var(--glass-border); border-left: 4px solid var(--accent);
+    }
+    .resp-meta { display: flex; justify-content: space-between; margin-bottom: 0.6rem; color: var(--text-muted); font-size: 0.85rem; flex-wrap: wrap; gap: 0.5rem; }
+    .resp-field { margin: 0.4rem 0; }
+    .resp-label { color: var(--accent); font-weight: 500; }
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 20px; background: rgba(0,243,255,0.1); color: var(--accent); font-size: 0.75rem; margin-left: 0.4rem; }
+    .result-tag { display: inline-block; margin: 0.2rem 0.4rem 0 0; padding: 0.3rem 0.7rem; background: rgba(0, 255, 157, 0.15); border: 1px solid var(--success); border-radius: 20px; font-size: 0.85rem; color: var(--success); }
+    .result-tag.warn { background: rgba(255, 193, 7, 0.15); border-color: var(--warning); color: var(--warning); }
+
+    .hidden { display: none !important; }
+    .share-box {
+      text-align: center; margin-top: 1.5rem; padding: 1.2rem;
+      background: rgba(0,0,0,0.3); border-radius: 30px; border: 1px dashed var(--glass-border);
+    }
+    .share-box a { text-decoration: none; }
+    .link-display {
+      background: rgba(0,0,0,0.4); padding: 0.8rem; border-radius: 20px;
+      margin: 0.8rem 0; word-break: break-all; font-family: monospace;
+      font-size: 0.85rem; color: var(--accent); border: 1px solid var(--glass-border);
+    }
+    .info-box {
+      background: rgba(0, 243, 255, 0.08); border: 1px solid var(--accent);
+      border-radius: 20px; padding: 1rem; margin: 1rem 0; font-size: 0.9rem;
+    }
+    .info-box.warning { background: rgba(255, 193, 7, 0.1); border-color: var(--warning); }
+    .info-box.warning strong { color: var(--warning); }
+
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+      display: flex; justify-content: center; align-items: center; z-index: 1000;
+    }
+    .modal {
+      background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: 40px; padding: 2rem; width: 90%; max-width: 400px; text-align: center;
+    }
+    .modal-buttons { display: flex; gap: 0.8rem; justify-content: center; margin-top: 1rem; }
+    .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 0.5rem; min-height: 1.2rem; }
+    .admin-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      background: rgba(0, 255, 157, 0.15); color: var(--success);
+      padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; margin-left: 0.5rem;
+    }
+    .logout-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem; }
+
+    .install-prompt {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: var(--glass-bg); border: 1px solid var(--accent);
+      border-radius: 30px; padding: 1rem 1.5rem; display: flex; gap: 1rem;
+      align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px); z-index: 999;
+    }
+    .install-prompt button { padding: 0.5rem 1rem; font-size: 0.9rem; }
+
+    @media (max-width: 480px) {
+      .app-container { padding: 0.5rem; }
+      .glass-capsule { padding: 1.5rem 1rem; border-radius: 35px; }
+      .tabs { flex-direction: column; gap: 0.5rem; }
+      .btn { width: 100%; margin: 0.5rem 0; }
+      .install-prompt { flex-direction: column; width: 90%; }
+    }
+  </style>
+
+  <!-- Manifest dinamico -->
+  <link id="manifest-link" rel="manifest">
+</head>
+<body>
+  <div class="app-container">
+    <div class="glass-capsule">
+      <h1>🚄 TrainReport</h1>
+      <p class="subtitle">Sistema di Segnalazioni Ferroviarie</p>
+      
+      <div class="tabs">
+        <div class="tab locked" data-view="create" id="tab-create">🛠 Crea Modulo</div>
+        <div class="tab active" data-view="fill" id="tab-fill">📝 Compila</div>
+        <div class="tab locked" data-view="dashboard" id="tab-dashboard">📊 Risposte</div>
+      </div>
+
+      <div id="admin-status" class="hidden" style="text-align: right; margin-bottom: 0.5rem;">
+        <span class="admin-badge">🔐 Admin</span>
+        <button class="logout-btn" onclick="logout()">Esci</button>
+      </div>
+
+      <div id="view-create" class="hidden">
+        <div class="info-box warning"><strong>🔐 Area Amministrativa</strong><br>Solo utenti autorizzati possono creare moduli.</div>
+        
+        <input type="text" id="form-title" class="input-field" placeholder="Titolo Modulo" value="Controllo Tecnico Treni">
+        <input type="text" id="label-train" class="input-field" value="N. Treno">
+        <input type="text" id="label-track" class="input-field" value="Binario">
+        
+        <div id="carriages-builder-container"></div>
+        
+        <button class="btn btn-secondary" onclick="addCarriageBuilder()">🚃 + Aggiungi Vettura</button>
+        <button class="btn" onclick="saveAndShare()">💾 Salva & Genera Link</button>
+        
+        <div id="share-area" class="share-box hidden">
+          <h3>✅ Modulo Creato!</h3>
+          <div class="link-display" id="share-link"></div>
+          <a id="wa-share-btn" class="btn" href="#" target="_blank">📱 Invia su WhatsApp</a>
+          <button class="btn btn-secondary" onclick="copyLink()">📋 Copia Link</button>
+        </div>
+      </div>
+
+      <div id="view-fill">
+        <div class="info-box"><strong>📝 Compila la segnalazione:</strong><br>Inserisci i dati e seleziona lo stato per ogni segnalazione.</div>
+        <h2 id="fill-title" style="text-align:center; margin:1rem 0;">Caricamento...</h2>
+        <input type="text" id="fill-train" class="input-field" placeholder="N. Treno">
+        <input type="text" id="fill-track" class="input-field" placeholder="Binario">
+        <div id="fill-carriages"></div>
+        <button class="btn" onclick="submitResponse()">🚀 Invia Segnalazione</button>
+      </div>
+
+      <div id="view-dashboard" class="hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <h2 style="margin:0;">📊 Segnalazioni Ricevute</h2>
+          <button class="btn btn-danger" onclick="clearAllData()" style="padding:0.5rem 1rem; font-size:0.85rem;">🗑 Cancella</button>
+        </div>
+        <div id="responses-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="install-prompt" class="install-prompt hidden">
+    <span>📲 Installa TrainReport</span>
+    <button class="btn" onclick="installPWA()">Installa</button>
+    <button class="btn btn-secondary" onclick="dismissInstall()">✕</button>
+  </div>
+
+  <div id="login-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>🔐 Accesso Amministratore</h3>
+      <input type="password" id="admin-password" class="input-field" placeholder="Password" autocomplete="off">
+      <div class="error-msg" id="login-error"></div>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" onclick="closeLoginModal()">Annulla</button>
+        <button class="btn" onclick="checkPassword()">Accedi</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 🔹 CONFIGURAZIONE
+    const JSONBIN_CONFIG = {
+      apiKey: '$2a$10$tVUGmLSwGE0L2AnvZ3Abm.tTBK0rCWTBA6iTZUiZFubuPozhm9iMy',
+      binId: '69e4c3b7856a6821894da11a',
+      baseUrl: 'https://api.jsonbin.io/v3/b'
+    };
+    const ADMIN_CONFIG = { password: 'Qwerty1993', storageKey: 'tr_admin_auth' };
+    const AVAILABLE_RESPONSES = ['Ok', 'RINV', 'RINV CAVI CAF', 'MANCANZA 13 POLI', 'RINV MANCANZA SCORTE', 'CAF'];
+
+    // 🔹 PWA SETUP - Manifest Dinamico
+    const manifest = {
+      name: "TrainReport - Segnalazioni Ferroviarie",
+      short_name: "TrainReport",
+      description: "Sistema di gestione segnalazioni tecniche per treni",
+      start_url: "/",
+      display: "standalone",
+      background_color: "#05080f",
+      theme_color: "#00f3ff",
+      orientation: "portrait-primary",
+      icons: [
+        {
+          src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%2300f3ff' width='192' height='192'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='80'%3E🚄%3C/text%3E%3C/svg%3E",
+          sizes: "192x192",
+          type: "image/svg+xml",
+          purpose: "any maskable"
+        }
+      ]
+    };
+
+    const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+    const manifestURL = URL.createObjectURL(manifestBlob);
+    document.getElementById('manifest-link').href = manifestURL;
+
+    // 🔹 SERVICE WORKER INLINE
+    const swCode = `
+      const CACHE_NAME = 'trainreport-v1';
+      const ASSETS = ['/'];
+      
+      self.addEventListener('install', e => {
+        e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
+        self.skipWaiting();
+      });
+      
+      self.addEventListener('fetch', e => {
+        e.respondWith(
+          caches.match(e.request).then(response => response || fetch(e.request))
+        );
+      });
+      
+      self.addEventListener('activate', e => {
+        e.waitUntil(
+          caches.keys().then(keys => 
+            Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
+          )
+        );
+        self.clients.claim();
+      });
+    `;
+
+    const swBlob = new Blob([swCode], {type: 'application/javascript'});
+    const swURL = URL.createObjectURL(swBlob);
+
+    // Registration Service Worker
+    if('serviceWorker' in navigator) {
+      navigator.serviceWorker.register(swURL)
+        .then(() => console.log('✅ Service Worker registrato'))
+        .catch(err => console.log('❌ SW registration failed:', err));
+    }
+
+    // 🔹 INSTALL PROMPT
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('install-prompt').classList.remove('hidden');
+    });
+
+    async function installPWA() {
+      if(!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      document.getElementById('install-prompt').classList.add('hidden');
+    }
+
+    function dismissInstall() {
+      document.getElementById('install-prompt').classList.add('hidden');
+    }
+
+    // 🔹 STATE & AUTH
+    let forms = {}, responses = {}, currentFormId = null, carriageCount = 0, isAdmin = false;
+    
+    async function jsonbinGet() {
+      try {
+        const res = await fetch(`${JSONBIN_CONFIG.baseUrl}/${JSONBIN_CONFIG.binId}`, { headers: { 'X-Access-Key': JSONBIN_CONFIG.apiKey } });
+        return (await res.json()).record;
+      } catch(e) {
+        return { forms: JSON.parse(localStorage.getItem('tr_forms')||'{}'), responses: JSON.parse(localStorage.getItem('tr_responses')||'{}') };
+      }
+    }
+    async function jsonbinSave(data) {
+      try {
+        await fetch(`${JSONBIN_CONFIG.baseUrl}/${JSONBIN_CONFIG.binId}`, {
+          method: 'PUT', headers: { 'X-Access-Key': JSONBIN_CONFIG.apiKey, 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_CONFIG.apiKey },
+          body: JSON.stringify(data)
+        });
+      } catch(e) {
+        localStorage.setItem('tr_forms', JSON.stringify(data.forms));
+        localStorage.setItem('tr_responses', JSON.stringify(data.responses));
+      }
+    }
+
+    function checkAdminAuth() { isAdmin = (sessionStorage.getItem(ADMIN_CONFIG.storageKey) === 'authenticated'); updateAdminUI(); }
+    function setAdminAuth(v) { v ? sessionStorage.setItem(ADMIN_CONFIG.storageKey, 'authenticated') : sessionStorage.removeItem(ADMIN_CONFIG.storageKey); isAdmin = v; updateAdminUI(); }
+    function updateAdminUI() {
+      document.getElementById('admin-status').classList.toggle('hidden', !isAdmin);
+      document.getElementById('tab-create').classList.toggle('locked', !isAdmin);
+      document.getElementById('tab-dashboard').classList.toggle('locked', !isAdmin);
+      if(!isAdmin && document.querySelector('.tab.active')?.dataset.view !== 'fill') document.querySelector('[data-view="fill"]').click();
+    }
+    function openLoginModal(target) {
+      document.getElementById('login-modal').classList.remove('hidden');
+      document.getElementById('admin-password').value = '';
+      document.getElementById('login-error').textContent = '';
+      document.getElementById('admin-password').dataset.target = target;
+      document.getElementById('admin-password').focus();
+      document.getElementById('admin-password').onkeypress = (e) => e.key === 'Enter' && checkPassword();
+    }
+    function closeLoginModal() { document.getElementById('login-modal').classList.add('hidden'); }
+    function checkPassword() {
+      if(document.getElementById('admin-password').value === ADMIN_CONFIG.password) {
+        setAdminAuth(true); closeLoginModal();
+        const t = document.getElementById('admin-password').dataset.target;
+        if(t && t !== 'fill') document.querySelector(`[data-view="${t}"]`)?.click();
+      } else { document.getElementById('login-error').textContent = '❌ Password errata'; }
+    }
+    function logout() { if(confirm('Uscire?')) { setAdminAuth(false); document.querySelector('[data-view="fill"]').click(); } }
+
+    async function initData() { const d = await jsonbinGet(); forms = d.forms || {}; responses = d.responses || {}; checkAdminAuth(); }
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        const v = tab.dataset.view;
+        if((v==='create'||v==='dashboard') && !isAdmin) { e.preventDefault(); openLoginModal(v); return; }
+        document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active');
+        document.querySelectorAll('[id^="view-"]').forEach(el=>el.classList.add('hidden'));
+        document.getElementById(`view-${v}`).classList.remove('hidden');
+        if(v==='dashboard') renderDashboard();
+      });
+    });
+
+    function addCarriageBuilder(name='', issues=[]) {
+      const container = document.getElementById('carriages-builder-container');
+      const idx = carriageCount++;
+      const div = document.createElement('div');
+      div.className = 'carriage-builder';
+      
+      let issuesHTML = '';
+      issues.forEach(iss => {
+        issuesHTML += `<div class="issue-pill" data-name="${iss.name}" data-allowed='${JSON.stringify(iss.allowed)}'>
+          <span><span class="issue-name">${iss.name}</span> <span class="issue-resps">(${iss.allowed.length} opzioni)</span></span>
+          <span class="remove-issue" onclick="this.parentElement.remove()">×</span>
+        </div>`;
+      });
+
+      div.innerHTML = `
+        <div class="carriage-header">
+          <h3>🚃 Vettura #${idx+1}</h3>
+          <button class="btn btn-danger" onclick="this.closest('.carriage-builder').remove()" style="padding:0.4rem 0.8rem; font-size:0.8rem;">🗑</button>
+        </div>
+        <input type="text" class="input-field c-name" placeholder="Nome Vettura" value="${name}">
+        
+        <div class="issues-section">
+          <span class="signals-label">📝 Configura Segnalazione & Risposte Ammissibili</span>
+          <input type="text" class="input-field issue-input" placeholder="Nome segnalazione (es. Porta guasta, Luci spente)" style="margin:0.5rem 0;">
+          
+          <div class="responses-grid">
+            ${AVAILABLE_RESPONSES.map(r => `<label class="resp-check"><input type="checkbox" value="${r}"><span>${r}</span></label>`).join('')}
+          </div>
+          
+          <button class="btn btn-secondary" onclick="addIssueToBuilder(this)" style="margin-top:0.5rem; width:100%;">➕ Aggiungi Segnalazione alla Lista</button>
+          <div class="issues-container">${issuesHTML}</div>
+        </div>
+      `;
+      container.appendChild(div);
+    }
+
+    function addIssueToBuilder(btn) {
+      const section = btn.closest('.issues-section');
+      const nameInput = section.querySelector('.issue-input');
+      const checked = Array.from(section.querySelectorAll('.resp-check input:checked')).map(i => i.value);
+      const name = nameInput.value.trim();
+      
+      if(!name) return alert('Inserisci un nome per la segnalazione');
+      if(checked.length === 0) return alert('Seleziona almeno una risposta ammissibile');
+      
+      const container = section.querySelector('.issues-container');
+      const pill = document.createElement('div');
+      pill.className = 'issue-pill';
+      pill.dataset.name = name;
+      pill.dataset.allowed = JSON.stringify(checked);
+      pill.innerHTML = `<span><span class="issue-name">${name}</span> <span class="issue-resps">(${checked.length} opzioni)</span></span>
+                        <span class="remove-issue" onclick="this.parentElement.remove()">×</span>`;
+      container.appendChild(pill);
+      
+      nameInput.value = '';
+      section.querySelectorAll('.resp-check input').forEach(i => i.checked = false);
+      nameInput.focus();
+    }
+
+    async function saveAndShare() {
+      const title = document.getElementById('form-title').value.trim() || 'Modulo Segnalazioni';
+      const labelTrain = document.getElementById('label-train').value.trim() || 'N. Treno';
+      const labelTrack = document.getElementById('label-track').value.trim() || 'Binario';
+      
+      const carriages = [];
+      document.querySelectorAll('.carriage-builder').forEach(div => {
+        const name = div.querySelector('.c-name').value.trim() || `Vettura ${carriages.length+1}`;
+        const issues = Array.from(div.querySelectorAll('.issues-container .issue-pill')).map(p => ({
+          name: p.dataset.name,
+          allowed: JSON.parse(p.dataset.allowed)
+        }));
+        if(issues.length === 0) { alert(`Aggiungi almeno una segnalazione per "${name}"`); return; }
+        carriages.push({ name, issues });
+      });
+
+      if(carriages.length === 0) return alert('Aggiungi almeno una vettura!');
+
+      const id = 'f_' + Date.now().toString(36);
+      forms[id] = { title, labelTrain, labelTrack, carriages, created: new Date().toISOString() };
+      responses[id] = [];
+      await jsonbinSave({ forms, responses });
+
+      const url = `${window.location.origin}${window.location.pathname}?form=${id}`;
+      document.getElementById('share-link').textContent = url;
+      document.getElementById('wa-share-btn').href = `https://wa.me/?text=${encodeURIComponent(`📋 *${title}*\n👉 ${url}`)}`;
+      document.getElementById('share-area').classList.remove('hidden');
+      document.getElementById('share-area').scrollIntoView({ behavior: 'smooth' });
+    }
+    function copyLink() { navigator.clipboard.writeText(document.getElementById('share-link').textContent).then(()=>alert('✅ Copiato!')); }
+
+    function loadFormToFill(id) {
+      if(!forms[id]) { document.getElementById('fill-title').textContent='❌ Modulo non trovato'; document.getElementById('fill-carriages').innerHTML='<p style="color:var(--danger);text-align:center;padding:2rem;">Non valido.</p>'; return; }
+      currentFormId = id;
+      const f = forms[id];
+      document.getElementById('fill-title').textContent = f.title;
+      document.getElementById('fill-train').placeholder = f.labelTrain;
+      document.getElementById('fill-track').placeholder = f.labelTrack;
+      
+      const container = document.getElementById('fill-carriages');
+      container.innerHTML = '';
+
+      f.carriages.forEach((c, ci) => {
+        const section = document.createElement('div');
+        section.className = 'carriage-section';
+        section.innerHTML = `<div class="carriage-title">🚃 ${c.name}</div>`;
+        
+        c.issues.forEach((iss, ii) => {
+          const block = document.createElement('div');
+          block.className = 'issue-fill-block';
+          block.innerHTML = `<div class="issue-fill-label">⚠️ ${iss.name}</div><div class="radio-capsule-group" data-ci="${ci}" data-ii="${ii}"></div>`;
+          const group = block.querySelector('.radio-capsule-group');
+          const groupName = `r_${ci}_${ii}`;
+          
+          iss.allowed.forEach((resp, ri) => {
+            group.innerHTML += `<div class="radio-capsule">
+              <input type="radio" name="${groupName}" id="${groupName}_${ri}" value="${resp}">
+              <label for="${groupName}_${ri}">${resp}</label>
+            </div>`;
+          });
+          section.appendChild(block);
+        });
+        container.appendChild(section);
+      });
+    }
+
+    async function submitResponse() {
+      if(!currentFormId) return;
+      const train = document.getElementById('fill-train').value.trim();
+      const track = document.getElementById('fill-track').value.trim();
+      if(!train || !track) return alert('⚠️ Inserisci N. Treno e Binario.');
+
+      const carriageData = [];
+      let valid = true;
+      
+      document.querySelectorAll('.carriage-section').forEach((sec, ci) => {
+        sec.querySelectorAll('.radio-capsule-group').forEach(group => {
+          const ii = group.dataset.ii;
+          const checked = group.querySelector('input:checked');
+          const form = forms[currentFormId];
+          const issueName = form.carriages[ci].issues[ii].name;
+          
+          if(!checked) { valid = false; }
+          carriageData.push({ ci, ii, issueName, selected: checked ? checked.value : null });
+        });
+      });
+
+      if(!valid) return alert('⚠️ Seleziona una risposta per OGNI segnalazione.');
+
+      responses[currentFormId].push({ train, track, carriages: carriageData, date: new Date().toISOString() });
+      await jsonbinSave({ forms, responses });
+      
+      alert('✅ Segnalazione inviata!');
+      document.querySelectorAll('#fill-carriages input:checked').forEach(i=>i.checked=false);
+      document.getElementById('fill-train').value = '';
+      document.getElementById('fill-track').value = '';
+    }
+
+    function renderDashboard() {
+      if(!isAdmin) return;
+      const list = document.getElementById('responses-list');
+      list.innerHTML = '';
+      const all = Object.values(responses).flat();
+      if(all.length===0) { list.innerHTML='<div class="info-box" style="text-align:center;padding:2rem;">📭 Nessuna segnalazione.</div>'; return; }
+
+      let count=0;
+      for(const fid in responses) {
+        if(!forms[fid]) continue;
+        responses[fid].forEach(resp => {
+          count++;
+          const card = document.createElement('div');
+          card.className = 'response-card';
+          let html = `<div class="resp-meta"><span><strong>${forms[fid].title}</strong> <span class="badge">#${count}</span></span><span>🕐 ${new Date(resp.date).toLocaleString('it-IT')}</span></div>
+                      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.8rem;">
+                        <div class="resp-field"><span class="resp-label">${forms[fid].labelTrain}:</span> <strong>${resp.train}</strong></div>
+                        <div class="resp-field"><span class="resp-label">${forms[fid].labelTrack}:</span> <strong>${resp.track}</strong></div>
+                      </div>`;
+          
+          resp.carriages.forEach(c => {
+            const isOk = c.selected === 'Ok';
+            html += `<div style="margin:0.5rem 0; padding-left:0.8rem; border-left:2px solid var(--accent-glow);">
+              <div style="color:var(--accent); font-weight:500; margin-bottom:0.2rem;">🚃 ${forms[fid].carriages[c.ci].name} → ${c.issueName}</div>
+              <span class="result-tag ${isOk?'':'warn'}">${c.selected}</span>
+            </div>`;
+          });
+          card.innerHTML = html;
+          list.appendChild(card);
+        });
+      }
+    }
+
+    async function clearAllData() {
+      if(!isAdmin) return;
+      if(confirm('⚠️ Cancellare TUTTO?')) {
+        forms={}; responses={};
+        await jsonbinSave({forms,responses});
+        renderDashboard();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initData();
+      const p = new URLSearchParams(window.location.search);
+      if(p.has('form')) { loadFormToFill(p.get('form')); document.querySelector('[data-view="fill"]').click(); }
+      else document.querySelector('[data-view="fill"]').click();
+    });
+  </script>
+</body>
+</html>
